@@ -2,7 +2,7 @@ use clap::Parser;
 use clap_verbosity_flag::Verbosity;
 use color_eyre::eyre::{bail, Result};
 use git2::{Repository, Sort};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::metadata::LevelFilter;
 
 #[macro_use]
@@ -20,7 +20,7 @@ struct Args {
 
     /// Path to the subtree within the repository
     #[clap(long, value_parser)]
-    prefix: String,
+    prefix: PathBuf,
 
     /// Verbosity level
     #[clap(flatten)]
@@ -56,13 +56,16 @@ fn main() -> Result<()> {
         for line in msg.lines() {
             if let Some(dir) = line.strip_prefix("git-subtree-dir: ") {
                 debug!(?oid, %msg, "found git-subtree addition commit");
-                if prefix == dir {
-                    return processor::process(&repo, oid, msg, prefix);
+                if prefix == Path::new(dir) {
+                    return processor::process(&repo, oid, prefix);
                 }
             }
         }
     }
-    bail!("Did not find subtree addition commit for {prefix}");
+    bail!(
+        "Did not find subtree addition commit for {}",
+        prefix.display()
+    );
 }
 
 fn convert_filter(filter: log::LevelFilter) -> LevelFilter {
