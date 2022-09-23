@@ -20,7 +20,7 @@ struct Args {
 
     /// Path to the subtree within the repository
     #[clap(long, value_parser)]
-    prefix: PathBuf,
+    prefix: String,
 
     /// Verbosity level
     #[clap(flatten)]
@@ -56,16 +56,13 @@ fn main() -> Result<()> {
         for line in msg.lines() {
             if let Some(dir) = line.strip_prefix("git-subtree-dir: ") {
                 debug!(?oid, %msg, "found git-subtree addition commit");
-                if prefix.to_str() == Some(dir) {
-                    return processor::process(&repo, oid, msg);
+                if prefix == dir {
+                    return processor::process(&repo, oid, msg, prefix);
                 }
             }
         }
     }
-    bail!(
-        "Did not find subtree addition commit for {}",
-        prefix.display()
-    );
+    bail!("Did not find subtree addition commit for {prefix}");
 }
 
 fn convert_filter(filter: log::LevelFilter) -> LevelFilter {
