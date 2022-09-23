@@ -23,25 +23,29 @@ pub fn process(repo: &Repository, subtree_root_commit: Oid, prefix: PathBuf) -> 
             relevant_commits.len()
         );
         let commit = repo.find_commit(oid)?;
+        if commit.parent_count() > 1 {
+            // We ignore merge commits, as the rustc repo only has trivial merges.
+            trace!(?commit, "skipping merge commit");
+            continue;
+        }
         trace!(?commit, "found commit in range");
-        'parents: for parent in commit.parents() {
-            let diff =
-                repo.diff_tree_to_tree(Some(&parent.tree()?), Some(&commit.tree()?), None)?;
-            for delta in diff.deltas() {
-                for file in [delta.old_file(), delta.new_file()] {
-                    let path = file.path().unwrap();
-                    trace!(?path);
-                    if path.starts_with(&prefix) {
-                        trace!(?commit);
-                        // we do this very late, because it's an expensive operation
-                        if repo.graph_descendant_of(parent.id(), subtree_root_commit)? {
-                            relevant_commits.push(commit.clone());
-                            debug!(?commit);
-                            continue 'commits;
-                        } else {
-                            continue 'parents;
-                        }
-                    }
+        let parent;
+        let diff = repo.diff_tree_to_tree(
+            if commit.parent_count() == 1 {
+                parent = commit.parent(0)?.tree()?;
+                Some(&parent)
+            } else {
+                None
+            },
+            Some(&commit.tree()?),
+            None,
+        )?;
+        for delta in diff.deltas() {
+            for file in [delta.old_file(), delta.new_file()] {
+                let path = file.path().unwrap();
+                if path.starts_with(&prefix) {
+                    relevant_commits.push(commit.clone());
+                    continue 'commits;
                 }
             }
         }
