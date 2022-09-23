@@ -1,7 +1,7 @@
 use clap::Parser;
 use clap_verbosity_flag::Verbosity;
 use color_eyre::eyre::{bail, Result};
-use git2::Repository;
+use git2::{Repository, Sort};
 use std::path::PathBuf;
 use tracing::metadata::LevelFilter;
 
@@ -46,6 +46,7 @@ fn main() -> Result<()> {
 
     let repo = Repository::open(path)?;
     let mut walker = repo.revwalk()?;
+    walker.set_sorting(Sort::TOPOLOGICAL)?;
     walker.push_head()?;
     for oid in walker {
         let oid = oid?;
@@ -56,7 +57,7 @@ fn main() -> Result<()> {
             if let Some(dir) = line.strip_prefix("git-subtree-dir: ") {
                 debug!(?oid, %msg, "found git-subtree addition commit");
                 if prefix.to_str() == Some(dir) {
-                    return processor::process(oid, msg);
+                    return processor::process(&repo, oid, msg);
                 }
             }
         }
